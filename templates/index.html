@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Traffic Sign AI — Instant Recognition</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <style>
+        :root {
+            --primary: #007bff;
+            --success: #28a745;
+            --danger: #dc3545;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --gray: #6c757d;
+        }
+        [data-theme="dark"] {
+            --bg: #121212;
+            --text: #e0e0e0;
+            --card: #1e1e1e;
+            --border: #333;
+        }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg, var(--light));
+            color: var(--text, var(--dark));
+            transition: all 0.3s ease;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 700px;
+            margin: 40px auto;
+            padding: 30px;
+            background: var(--card, white);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+        }
+        h1 {
+            text-align: center;
+            color: var(--primary);
+            margin-bottom: 10px;
+            font-size: 2.4rem;
+        }
+        .subtitle {
+            text-align: center;
+            color: var(--gray);
+            margin-bottom: 30px;
+        }
+        .upload-area {
+            border: 3px dashed var(--primary);
+            border-radius: 12px;
+            padding: 60px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            background: rgba(0,123,255,0.08);
+            border-color: #0056b3;
+        }
+        .upload-area i {
+            font-size: 3.5rem;
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+        .upload-area p {
+            margin: 5px 0;
+            color: var(--gray);
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .btn {
+            padding: 12px 30px;
+            font-size: 1.1rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        .btn-secondary {
+            background: var(--gray);
+            color: white;
+        }
+        #preview {
+            max-width: 100%;
+            max-height: 300px;
+            margin: 20px auto;
+            display: block;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            display: none;
+        }
+        #result {
+            margin-top: 25px;
+            font-size: 1.6rem;
+            font-weight: bold;
+            text-align: center;
+            min-height: 40px;
+        }
+        .success { color: var(--success); }
+        .error { color: var(--danger); }
+        .loading {
+            display: none;
+            margin: 30px auto;
+            border: 6px solid #f3f3f3;
+            border-top: 6px solid var(--primary);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .theme-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--gray);
+        }
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            color: var(--gray);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body data-theme="light">
+
+    <i class="fas fa-moon theme-toggle" id="themeToggle"></i>
+
+    <div class="container">
+        <h1>Traffic Sign</h1>
+        <p class="subtitle">Upload or drag & drop a traffic sign image for instant recognition</p>
+
+        <div class="upload-area" id="uploadArea">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <p><strong>Click to upload</strong> or drag & drop your image here</p>
+            <p>Supported formats: JPG, PNG, JPEG</p>
+        </div>
+
+        <input type="file" id="fileInput" name="file" accept="image/*" required>
+
+        <div style="text-align: center;">
+            <button class="btn btn-primary" id="predictBtn" disabled>Predict Sign</button>
+        </div>
+
+        <img id="preview" alt="Preview of uploaded image"/>
+        
+        <div class="loading" id="loading"></div>
+
+        <div id="result"></div>
+    </div>
+
+    <footer>Powered by Deep Learning • German Traffic Sign Dataset (GTSRB)</footer>
+
+    <script>
+        const themeToggle = document.getElementById('themeToggle');
+        const body = document.body;
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const predictBtn = document.getElementById('predictBtn');
+        const preview = document.getElementById('preview');
+        const resultDiv = document.getElementById('result');
+        const loading = document.getElementById('loading');
+
+        // Theme Toggle
+        if (localStorage.getItem('theme') === 'dark') {
+            body.setAttribute('data-theme', 'dark');
+            themeToggle.classList.replace('fa-moon', 'fa-sun');
+        }
+        themeToggle.onclick = () => {
+            if (body.getAttribute('data-theme') === 'dark') {
+                body.setAttribute('data-theme', 'light');
+                themeToggle.classList.replace('fa-sun', 'fa-moon');
+                localStorage.setItem('theme', 'light');
+            } else {
+                body.setAttribute('data-theme', 'dark');
+                themeToggle.classList.replace('fa-moon', 'fa-sun');
+                localStorage.setItem('theme', 'dark');
+            }
+        };
+
+        // Drag & Drop + Click Upload
+        uploadArea.addEventListener('click', () => fileInput.click());
+        ['dragover', 'dragenter'].forEach(event => {
+            uploadArea.addEventListener(event, e => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+        });
+        ['dragleave', 'drop'].forEach(event => {
+            uploadArea.addEventListener(event, e => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+            });
+        });
+        uploadArea.addEventListener('drop', e => {
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                handleFile(file);
+            }
+        });
+        fileInput.onchange = e => {
+            const file = e.target.files[0];
+            if (file) handleFile(file);
+        };
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                preview.src = reader.result;
+                preview.style.display = 'block';
+                predictBtn.disabled = false;
+                resultDiv.innerHTML = '';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Predict Button
+        predictBtn.onclick = async () => {
+            if (!fileInput.files[0]) return;
+
+            loading.style.display = 'block';
+            predictBtn.disabled = true;
+            resultDiv.innerHTML = '';
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Prediction failed');
+
+                const prediction = await response.text();
+                resultDiv.innerHTML = `<i class="fas fa-check-circle" style="color:var(--success);"></i> ${prediction}`;
+                resultDiv.className = 'success';
+            } catch (err) {
+                resultDiv.innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--danger);"></i> Error: ${err.message}`;
+                resultDiv.className = 'error';
+            } finally {
+                loading.style.display = 'none';
+                predictBtn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>
